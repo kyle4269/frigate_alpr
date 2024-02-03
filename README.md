@@ -74,6 +74,7 @@ If you're using CodeProject.AI, you'll need to comment out plate_recognizer in y
 code_project:
   api_url: http://127.0.0.1:32168/v1/image/alpr
 ```
+
 ### Debugging
 
 set `logger_level` in your config to `DEBUG` to see more logging information:
@@ -108,6 +109,7 @@ services:
     environment:
       - TZ=America/New_York
 ```
+
 ### Crop License Plate
 
 If you want to crop the license plate and have it added the the saved snapshot, add the following to your config.yaml:
@@ -119,6 +121,7 @@ frigate:
   scale_middle: 3.0 # If detected in the middle of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
   scale_bottom: 2.0 # If detected in the bottom third of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
 ```
+
 ### Clean Saved Snapshots
 **DISCLAIMER:**
 
@@ -131,6 +134,18 @@ If you want to only keep X days of snapshots, add the following to your config.y
 frigate:
   clean_old_images: True
   days_of_snapshots: 30
+```
+
+### Telegram Support
+
+If you want to send the saved snapshot to telegram, add the following to your config.yaml:
+
+```yml
+frigate:
+telegram:
+  token: "XXXXXXX"
+  chat_id: "XXXXXXXX"
+  sendphoto: True # Setting this to False will still send a message to Telegram with the Plate Number and Score.
 ```
 
 ### Monitor Watched Plates

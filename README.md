@@ -74,29 +74,6 @@ If you're using CodeProject.AI, you'll need to comment out plate_recognizer in y
 code_project:
   api_url: http://127.0.0.1:32168/v1/image/alpr
 ```
-
-### Running
-
-```bash
-docker run -v /path/to/config:/config -e TZ=America/New_York -it --rm --name frigate_plate_recognizer lmerza/frigate_plate_recognizer:latest
-```
-
-or using docker-compose:
-
-```yml
-services:
-  frigate_plate_recognizer:
-    image: lmerza/frigate_plate_recognizer:latest
-    container_name: frigate_plate_recognizer
-    volumes:
-      - /path/to/config:/config
-    restart: unless-stopped
-    environment:
-      - TZ=America/New_York
-```
-
-https://hub.docker.com/r/lmerza/frigate_plate_recognizer
-
 ### Debugging
 
 set `logger_level` in your config to `DEBUG` to see more logging information:
@@ -113,7 +90,6 @@ If you want frigate-plate-recognizer to automatically save snapshots of recogniz
 
 ```yml
 frigate:
-  save_snapshots: True # Saves a snapshot called [Camera Name]_[timestamp].png
   draw_box: True # Optional - Draws a box around the plate on the snapshot along with the license plate text (Required Frigate plus setting)
   always_save_snapshot: True # Optional - will save a snapshot of every event sent to frigate_plate_recognizer, even if no plate is detected
 ```
@@ -132,6 +108,30 @@ services:
     environment:
       - TZ=America/New_York
 ```
+### Crop License Plate
+
+If you want to crop the license plate and have it added the the saved snapshot, add the following to your config.yaml:
+```yml
+frigate:
+  crop_plate: True
+  crop_plate_location: bottom_right # Options are : top_left, top_right, bottom_left and bottom_right
+  scale_top: 3.5 # If detected in the top third of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
+  scale_middle: 3.0 # If detected in the middle of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
+  scale_bottom: 2.0 # If detected in the bottom third of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
+```
+### Clean Saved Snapshots
+**DISCLAIMER:**
+
+**THIS WILL DELETE SNAPSHOTS!!**
+
+**INCLUDING SNAPSHOTS YOU ALREADY HAVE THAT ARE OLDER THAN X DAYS!!**
+
+If you want to only keep X days of snapshots, add the following to your config.yaml:
+```yml
+frigate:
+  clean_old_images: True
+  days_of_snapshots: 30
+```
 
 ### Monitor Watched Plates
 
@@ -148,3 +148,5 @@ frigate:
 If a watched plate is found in the list of candidates plates returned by plate-recognizer / CP.AI, the response will be updated to use that plate amd its score. The original plate will be added to the MQTT response as an additional `original_plate` field.
 
 If no candidates match and fuzzy_match is enabled with a value, the recognized plate is compared against each of the watched_plates using fuzzy matching. If a plate is found with a score > fuzzy_match, the response will be updated with that plate. The original plate and the associated fuzzy_score will be added to the MQTT response as additional fields `original_plate` and `fuzzy_score`.
+
+This majority of this code was done by [Leonardo Merza](https://github.com/ljmerza) and [gadget-man](https://github.com/gadget-man). I added my own functions.

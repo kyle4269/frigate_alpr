@@ -141,7 +141,6 @@ frigate:
 If you want to send the saved snapshot to telegram, add the following to your config.yaml:
 
 ```yml
-frigate:
 telegram:
   token: "XXXXXXX"
   chat_id: "XXXXXXXX"

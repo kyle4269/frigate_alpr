@@ -163,4 +163,4 @@ If a watched plate is found in the list of candidates plates returned by plate-r
 
 If no candidates match and fuzzy_match is enabled with a value, the recognized plate is compared against each of the watched_plates using fuzzy matching. If a plate is found with a score > fuzzy_match, the response will be updated with that plate. The original plate and the associated fuzzy_score will be added to the MQTT response as additional fields `original_plate` and `fuzzy_score`.
 
-This majority of this code was done by [Leonardo Merza](https://github.com/ljmerza) and [gadget-man](https://github.com/gadget-man). I added my own functions.
+This majority of this code was written by [Leonardo Merza](https://github.com/ljmerza) and [gadget-man](https://github.com/gadget-man). I added my own functions.

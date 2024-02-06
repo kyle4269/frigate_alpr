@@ -100,7 +100,7 @@ Snapshots will be saved into the '/plates' directory within your container - to 
 ```yml
 services:
   frigate_plate_recognizer:
-    image: lmerza/frigate_plate_recognizer:latest
+    image: XXXXXXXXX
     container_name: frigate_plate_recognizer
     volumes:
       - /path/to/config:/config

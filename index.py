@@ -22,7 +22,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.0.6'
+VERSION = '2.1.0'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -37,85 +37,71 @@ CURRENT_EVENTS = {}
 
 def clean_old_images():
     folder_path = SNAPSHOT_PATH
-    days_to_keep = config['frigate'].get('days_of_snapshots')
-    extension='png'
-
-    if not config['frigate'].get('days_of_snapshots'):
-        _LOGGER.error("days_of_snapshots not in config.yaml, skipping clean_old_images!")
+    try:
+        days_to_keep = int(config['frigate'].get('days_of_snapshots', 0))
+    except ValueError:
+        _LOGGER.error("Invalid 'days_of_snapshots' value in config.yaml, must be an integer.")
         return
 
-    # Get the current time
+    if days_to_keep <= 0:
+        _LOGGER.error("days_of_snapshots not in config.yaml or invalid, skipping clean_old_images!")
+        return
+
+    extension = 'png'
     current_time = time.time()
+    threshold_time = current_time - days_to_keep * 86400  # seconds in a day
+    num_files_to_delete = 0
 
-    # Calculate the threshold time
-    threshold_time = current_time - days_to_keep * 86400  # 86400 seconds in a day
-
-    # Dictionary to store file creation times
-    file_times = {}
-
-    # List all files in the directory
     for filename in os.listdir(folder_path):
-        # Check for file extension
         if filename.endswith(extension):
             file_path = os.path.join(folder_path, filename)
-
-            # Get the file's modification time
             file_time = os.path.getmtime(file_path)
-            file_times[file_path] = file_time
 
-    # Filter out files that are older than the threshold but keep recent ones
-    files_to_delete = [file for file, mtime in file_times.items() if mtime < threshold_time]
+            if file_time < threshold_time:
+                try:
+                    os.remove(file_path)
+                    num_files_to_delete += 1
+                except Exception as e:
+                    _LOGGER.error(f"Error deleting file {file_path}: {e}")
 
-    # Check if there are any files to delete
-    if not files_to_delete:
+    if num_files_to_delete == 0:
         _LOGGER.info("No files need to be deleted.")
-        return
+    else:
+        _LOGGER.info(f"Deleted {num_files_to_delete} files older than {days_to_keep} days.")
 
-    # Count the number of files to delete
-    num_files_to_delete = len(files_to_delete)
+def send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number):
+    chat_id = config.get('telegram', {}).get('chat_id')
+    token = config.get('telegram', {}).get('token')
 
-    # Delete older files
-    for file in files_to_delete:
-        os.remove(file)
-
-    _LOGGER.info(f"Deleted {num_files_to_delete} files that were older than {days_to_keep} days.")
-
-def telegram(image_name, image_path, plate_number, plate_score, original_plate_number):
-    chatId = config['telegram'].get('chat_id')
-    token = config['telegram'].get('token')
-
-    # Make sure the plate is upper case
+    # Format plate numbers and score
     plate_number = plate_number.upper()
     original_plate_number = original_plate_number.upper()
+    percent_score = f"{plate_score:.1%}" if plate_score is not None else "N/A"
 
-    if plate_score is not None:
-        percentscore = "{:.1%}".format(plate_score)
+    normalized_plate_number = plate_number.replace(" ", "").upper()
+    normalized_original_plate_number = original_plate_number.replace(" ", "").upper()
+
+    if normalized_plate_number == normalized_original_plate_number:
+        message = f"Plate: {plate_number} Confidence: {percent_score}"
     else:
-        percentscore = "N/A"
+        message = f"Watched Plate: {plate_number} Confidence: {percent_score} Detected Plate: {original_plate_number}"
 
-    if plate_number == original_plate_number:
-        telegram_msg = f"Plate: {plate_number} Confidence: {percentscore}"
-    else:
-        telegram_msg = f"Watched Plate: {plate_number} Confidence: {percentscore} Detected Plate: {original_plate_number}"
-
-    cap = telegram_msg
-
-    if(config['telegram'].get('sendphoto', False)):
-        image = image_path
+    # Decide whether to send a photo or a text message
+    if config.get('telegram', {}).get('sendphoto', False) and image_path:
         address = f'https://api.telegram.org/bot{token}/sendPhoto'
-        data = {"chat_id": chatId, "caption": cap}
-        with open(image, "rb") as imageFile:
-            result = requests.post(address, files={"photo": imageFile}, data=data).json()
-            _LOGGER.debug(f"{result}")
+        with open(image_path, "rb") as image_file:
+            files = {"photo": image_file}
+            data = {"chat_id": chat_id, "caption": message}
+            response = requests.post(address, files=files, data=data).json()
     else:
-        url_req = "https://api.telegram.org/bot" + token + "/sendMessage" + "?chat_id=" + chatId + "&text=" + cap
-        result = requests.get(url_req).json()
+        url_req = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
+        response = requests.get(url_req).json()
 
-    if result["ok"]:
-        _LOGGER.debug("Send to Telegram OK")
+    # Log the outcome
+    if response.get("ok"):
+        _LOGGER.debug("Sent to Telegram OK")
     else:
-        _LOGGER.debug(f"Telegram error: {result}")
-    return
+        _LOGGER.debug(f"Telegram error: {response}")
 
 def on_connect(mqtt_client, userdata, flags, rc):
     _LOGGER.info("MQTT Connected")
@@ -455,7 +441,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
     _LOGGER.info(f"Saving image with path: {image_path}")
     image.save(image_path)
 
-    telegram(image_name, image_path, plate_number, plate_score, original_plate_number)
+    send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
     if config['frigate'].get('clean_old_images', False):
         clean_old_images()

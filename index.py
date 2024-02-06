@@ -22,7 +22,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.0.4'
+VERSION = '2.0.6'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -84,7 +84,11 @@ def telegram(image_name, image_path, plate_number, plate_score):
     chatId = config['telegram'].get('chat_id')
     token = config['telegram'].get('token')
 
-    percentscore = "{:.1%}".format(plate_score)
+    if plate_score is not None:
+        percentscore = "{:.1%}".format(plate_score)
+    else:
+        percentscore = "N/A"
+
     telegram_msg = f"Plate: {plate_number} Confidence: {percentscore}"
     cap = telegram_msg
 
@@ -348,21 +352,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, plate_number, 
             if plate_number:
                 draw.text(((final_attribute[0]['box'][0]*image_width)+5,((final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height)+5), str(plate_number).upper(), font=font)
 
-            # save image
-            timestamp = datetime.now().strftime(DATETIME_FORMAT)
-            image_name = f"{after_data['camera']}_{timestamp}.png"
-            if plate_number:
-                image_name = f"{str(plate_number).upper()}_{image_name}"
-
-            image_path = f"{SNAPSHOT_PATH}/{image_name}"
-            _LOGGER.info(f"Saving image with path: {image_path}")
-            image.save(image_path)
-
-            telegram(image_name, image_path, plate_number, plate_score)
-
-            if config['frigate'].get('clean_old_images', False):
-                clean_old_images()
-
     # Crop license plate and insert it onto the saved snapshot
     if config['frigate'].get('crop_plate', False):
 
@@ -382,6 +371,8 @@ def save_image(config, after_data, frigate_url, frigate_event_id, plate_number, 
                 (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
             )
 
+
+
             # Coordinates from CodeProject.AI
 #            lic_plate = (
 #                plate_x_min,
@@ -389,7 +380,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, plate_number, 
 #                plate_x_max,
 #                plate_y_max
 #            )
-
+#
             plate_coords = lic_plate
             plate = image.crop(plate_coords)
 
@@ -439,20 +430,20 @@ def save_image(config, after_data, frigate_url, frigate_event_id, plate_number, 
             paste_location = location_mappings.get(crop_location)
             image.paste(resized_plate, paste_location)
 
-            # save image
-            timestamp = datetime.now().strftime(DATETIME_FORMAT)
-            image_name = f"{after_data['camera']}_{timestamp}.png"
-            if plate_number:
-                image_name = f"{str(plate_number).upper()}_{image_name}"
+    # save image
+    timestamp = datetime.now().strftime(DATETIME_FORMAT)
+    image_name = f"{after_data['camera']}_{timestamp}.png"
+    if plate_number:
+        image_name = f"{str(plate_number).upper()}_{image_name}"
 
-            image_path = f"{SNAPSHOT_PATH}/{image_name}"
-            _LOGGER.info(f"Saving image with path: {image_path}")
-            image.save(image_path)
+    image_path = f"{SNAPSHOT_PATH}/{image_name}"
+    _LOGGER.info(f"Saving image with path: {image_path}")
+    image.save(image_path)
 
-            telegram(image_name, image_path, plate_number, plate_score)
+    telegram(image_name, image_path, plate_number, plate_score)
 
-            if config['frigate'].get('clean_old_images', False):
-                clean_old_images()
+    if config['frigate'].get('clean_old_images', False):
+        clean_old_images()
 
 def check_first_message():
     global first_message
@@ -600,7 +591,7 @@ def on_message(client, userdata, message):
 
     # get frigate event payload
     payload_dict = json.loads(message.payload)
-    _LOGGER.debug(f'mqtt message: {payload_dict}')
+#    _LOGGER.debug(f'mqtt message: {payload_dict}')
 
     before_data = payload_dict.get('before', {})
     after_data = payload_dict.get('after', {})

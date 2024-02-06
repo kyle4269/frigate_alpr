@@ -80,16 +80,24 @@ def clean_old_images():
 
     _LOGGER.info(f"Deleted {num_files_to_delete} files that were older than {days_to_keep} days.")
 
-def telegram(image_name, image_path, plate_number, plate_score):
+def telegram(image_name, image_path, plate_number, plate_score, original_plate_number):
     chatId = config['telegram'].get('chat_id')
     token = config['telegram'].get('token')
+
+    # Make sure the plate is upper case
+    plate_number = plate_number.upper()
+    original_plate_number = original_plate_number.upper()
 
     if plate_score is not None:
         percentscore = "{:.1%}".format(plate_score)
     else:
         percentscore = "N/A"
 
-    telegram_msg = f"Plate: {plate_number} Confidence: {percentscore}"
+    if plate_number == original_plate_number:
+        telegram_msg = f"Plate: {plate_number} Confidence: {percentscore}"
+    else:
+        telegram_msg = f"Watched Plate: {plate_number} Confidence: {percentscore} Detected Plate: {original_plate_number}"
+
     cap = telegram_msg
 
     if(config['telegram'].get('sendphoto', False)):
@@ -309,7 +317,14 @@ def send_mqtt_message(plate_number, plate_score, frigate_event_id, after_data, f
 def has_common_value(array1, array2):
     return any(value in array2 for value in array1)
 
-def save_image(config, after_data, frigate_url, frigate_event_id, plate_number, plate_score):
+def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate, plate_number, plate_score):
+
+    original_plate_number = plate_number
+
+    if watched_plate:
+        plate_number = watched_plate
+    else:
+        plate_number = plate_number
 
     # get latest Event Data from Frigate API
     event_url = f"{frigate_url}/api/events/{frigate_event_id}"
@@ -440,7 +455,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, plate_number, 
     _LOGGER.info(f"Saving image with path: {image_path}")
     image.save(image_path)
 
-    telegram(image_name, image_path, plate_number, plate_score)
+    telegram(image_name, image_path, plate_number, plate_score, original_plate_number)
 
     if config['frigate'].get('clean_old_images', False):
         clean_old_images()
@@ -649,7 +664,9 @@ def on_message(client, userdata, message):
             frigate_url=frigate_url,
             frigate_event_id=frigate_event_id,
             plate_score=plate_score,
-            plate_number=watched_plate if watched_plate else plate_number
+            plate_number=plate_number,
+            watched_plate=watched_plate
+#            plate_number=watched_plate if watched_plate else plate_number
         )
 
 def setup_db():

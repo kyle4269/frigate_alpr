@@ -13,9 +13,10 @@ import sys
 import json
 import requests
 import io
-import difflib
 
 from PIL import Image, ImageDraw, UnidentifiedImageError, ImageFont
+from thefuzz import fuzz
+from thefuzz import process
 
 mqtt_client = None
 config = None
@@ -34,6 +35,30 @@ DATETIME_FORMAT = "%Y-%m-%d_%H-%M"
 PLATE_RECOGIZER_BASE_URL = 'https://api.platerecognizer.com/v1/plate-reader'
 DEFAULT_OBJECTS = ['car', 'motorcycle', 'bus']
 CURRENT_EVENTS = {}
+
+def check_plate_and_notify(plate_number):
+    # Parse the YAML configuration
+    alert_plates = config['frigate'].get('alert_plates', [])
+    _LOGGER.info(f"Alert Plates: {alert_plates}")
+    _LOGGER.info(f"Plate Number: {plate_number}")
+
+    # Normalize the given plate_number by removing spaces and converting to uppercase
+    normalized_plate_number = plate_number.replace(" ", "").upper()
+
+    # Compare the normalized plate_number against the normalized alert plates
+    for alert_plate in alert_plates:
+        normalized_alert_plate = alert_plate['plate'].replace(" ", "").upper()
+        if normalized_alert_plate == normalized_plate_number:
+            alert_message = f"Alert for {plate_number}: {alert_plate['description']}"
+            _LOGGER.info(f"{alert_message}")
+            notify_plate = plate_number
+            _LOGGER.info(f"Notify Plate: {plate_number.upper()}")
+            notify_plate_desc = alert_plate['description']
+            _LOGGER.info(f"Description: {notify_plate_desc}")
+            return True
+
+    # If no match is found
+    return False
 
 def clean_old_images():
     folder_path = SNAPSHOT_PATH
@@ -254,9 +279,9 @@ def check_watched_plates(plate_number, response):
     max_score = 0
     best_match = None
     for candidate in config_watched_plates:
-        seq = difflib.SequenceMatcher(a=str(plate_number).lower(), b=str(candidate).lower())
-        if seq.ratio() > max_score:
-            max_score = seq.ratio()
+        current_score = fuzz.ratio(str(plate_number).lower(), str(candidate).lower())
+        if current_score > max_score:
+            max_score = current_score
             best_match = candidate
 
     _LOGGER.debug(f"Best fuzzy_match: {best_match} ({max_score})")
@@ -272,6 +297,7 @@ def check_watched_plates(plate_number, response):
 def send_mqtt_message(plate_number, plate_score, frigate_event_id, after_data, formatted_start_time, watched_plate, fuzzy_score):
     if not config['frigate'].get('return_topic'):
         return
+
 
     if watched_plate:
         message = {
@@ -436,11 +462,10 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
     image_name = f"{after_data['camera']}_{timestamp}.png"
     if plate_number:
         image_name = f"{str(plate_number).upper()}_{image_name}"
-
     image_path = f"{SNAPSHOT_PATH}/{image_name}"
     _LOGGER.info(f"Saving image with path: {image_path}")
     image.save(image_path)
-
+    alert_message = None
     send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
     if config['frigate'].get('clean_old_images', False):
@@ -652,7 +677,6 @@ def on_message(client, userdata, message):
             plate_score=plate_score,
             plate_number=plate_number,
             watched_plate=watched_plate
-#            plate_number=watched_plate if watched_plate else plate_number
         )
 
 def setup_db():

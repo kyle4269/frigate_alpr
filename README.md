@@ -97,11 +97,16 @@ frigate:
 
 Snapshots will be saved into the '/plates' directory within your container - to access them directly, map an additional volume within your docker-compose, e.g.:
 
+### Running
+```bash
+docker run -v /path/to/config:/config /path/to/plates:/plates:rw -e TZ=America/New_York -it --rm --name frigate_alpr kyle4269/frigate_alpr:latest
+```
+or using docker-compose:
 ```yml
 services:
-  frigate_plate_recognizer:
-    image: XXXXXXXXX
-    container_name: frigate_plate_recognizer
+  frigate_alpr:
+    image: kyle4269/frigate_alpr:latest
+    container_name: frigate_alpr
     volumes:
       - /path/to/config:/config
       - /path/to/plates:/plates:rw

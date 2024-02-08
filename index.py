@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.1.1'
+VERSION = '2.1.3'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -35,30 +35,6 @@ DATETIME_FORMAT = "%Y-%m-%d_%H-%M"
 PLATE_RECOGIZER_BASE_URL = 'https://api.platerecognizer.com/v1/plate-reader'
 DEFAULT_OBJECTS = ['car', 'motorcycle', 'bus']
 CURRENT_EVENTS = {}
-
-def check_plate_and_notify(plate_number):
-    # Parse the YAML configuration
-    alert_plates = config['frigate'].get('alert_plates', [])
-    _LOGGER.info(f"Alert Plates: {alert_plates}")
-    _LOGGER.info(f"Plate Number: {plate_number}")
-
-    # Normalize the given plate_number by removing spaces and converting to uppercase
-    normalized_plate_number = plate_number.replace(" ", "").upper()
-
-    # Compare the normalized plate_number against the normalized alert plates
-    for alert_plate in alert_plates:
-        normalized_alert_plate = alert_plate['plate'].replace(" ", "").upper()
-        if normalized_alert_plate == normalized_plate_number:
-            alert_message = f"Alert for {plate_number}: {alert_plate['description']}"
-            _LOGGER.info(f"{alert_message}")
-            notify_plate = plate_number
-            _LOGGER.info(f"Notify Plate: {plate_number.upper()}")
-            notify_plate_desc = alert_plate['description']
-            _LOGGER.info(f"Description: {notify_plate_desc}")
-            return True
-
-    # If no match is found
-    return False
 
 def clean_old_images():
     folder_path = SNAPSHOT_PATH
@@ -154,17 +130,19 @@ def set_sublabel(frigate_url, frigate_event_id, sublabel, score):
     if len(sublabel) > 20:
         sublabel = sublabel[:20]
 
+    # Plates are always upper cased
+    sublabel = str(sublabel).upper()
+
     # Submit the POST request with the JSON payload
-    payload = { "subLabel": str(sublabel).upper() }
+    payload = { "subLabel": sublabel }
     headers = { "Content-Type": "application/json" }
     response = requests.post(post_url, data=json.dumps(payload), headers=headers)
 
-
-    percentscore = "{:.1%}".format(score)
+    percent_score = "{:.1%}".format(score)
 
     # Check for a successful response
     if response.status_code == 200:
-        _LOGGER.info(f"Sublabel set successfully to: {str(sublabel).upper()} with {percentscore} confidence")
+        _LOGGER.info(f"Sublabel set successfully to: {sublabel} with {percent_score} confidence")
     else:
         _LOGGER.error(f"Failed to set sublabel. Status code: {response.status_code}")
 
@@ -250,7 +228,7 @@ def check_watched_plates(plate_number, response):
     config_watched_plates = [str(x).lower() for x in config_watched_plates] #make sure watched_plates are all lower case
 
     #Step 1 - test if top plate is a watched plate
-    matching_plate = plate_number.lower() in config_watched_plates
+    matching_plate = str(plate_number).lower() in config_watched_plates
     if matching_plate:
         _LOGGER.info(f"Recognised plate is a Watched Plate: {plate_number}")
         return None, None, None
@@ -298,7 +276,6 @@ def send_mqtt_message(plate_number, plate_score, frigate_event_id, after_data, f
     if not config['frigate'].get('return_topic'):
         return
 
-
     if watched_plate:
         message = {
             'plate_number': str(watched_plate).upper(),
@@ -330,7 +307,6 @@ def has_common_value(array1, array2):
     return any(value in array2 for value in array1)
 
 def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate, plate_number, plate_score):
-
     original_plate_number = plate_number
 
     if watched_plate:
@@ -397,8 +373,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
                 (final_attribute[0]['box'][0]+final_attribute[0]['box'][2])*image_width,
                 (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
             )
-
-
 
             # Coordinates from CodeProject.AI
 #            lic_plate = (
@@ -542,9 +516,9 @@ def get_final_data(event_url):
             return final_attribute
         else:
             return None
+
     else:
         return None
-
 
 def is_valid_license_plate(after_data):
     # if user has frigate plus then check license plate attribute
@@ -590,9 +564,9 @@ def get_plate(snapshot):
 
     # check Plate Recognizer score
     min_score = config['frigate'].get('min_score')
-    score_too_low = min_score and plate_score and plate_score < min_score and not fuzzy_score
+    score_too_low = min_score and plate_score and plate_score < min_score
 
-    if score_too_low:
+    if not fuzzy_score and score_too_low:
         _LOGGER.info(f"Score is below minimum: {plate_score} ({plate_number})")
         return None, None, None, None
 
@@ -617,7 +591,7 @@ def on_message(client, userdata, message):
 
     # get frigate event payload
     payload_dict = json.loads(message.payload)
-#    _LOGGER.debug(f'mqtt message: {payload_dict}')
+    _LOGGER.debug(f'mqtt message: {payload_dict}')
 
     before_data = payload_dict.get('before', {})
     after_data = payload_dict.get('after', {})
@@ -766,7 +740,6 @@ def main():
 
 
     run_mqtt_client()
-
 
 if __name__ == '__main__':
     main()

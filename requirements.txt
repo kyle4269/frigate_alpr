@@ -3,3 +3,4 @@ requests==2.31.0
 PyYAML==6.0.1
 Pillow==9.1.1
 thefuzz==0.22.1
+rapidfuzz==3.6.1

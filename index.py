@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.1.7'
+VERSION = '2.1.8'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -303,28 +303,52 @@ def has_common_value(array1, array2):
     return any(value in array2 for value in array1)
 
 def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate, plate_number, plate_score):
-    original_plate_number = plate_number
 
-    if watched_plate:
-        plate_number = watched_plate
-    else:
-        plate_number = plate_number
+    if config['frigate'].get('always_save_snapshot', False):
 
-    # get latest Event Data from Frigate API
-    event_url = f"{frigate_url}/api/events/{frigate_event_id}"
+        original_plate_number = plate_number
 
-    final_attribute = get_final_data(event_url)
+        snapshot = get_snapshot(frigate_event_id, frigate_url, False)
+        if not snapshot:
+            return
 
-    # get latest snapshot
-    snapshot = get_snapshot(frigate_event_id, frigate_url, False)
-    if not snapshot:
-        return
+        image = Image.open(io.BytesIO(bytearray(snapshot)))
 
-    image = Image.open(io.BytesIO(bytearray(snapshot)))
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.truetype("./Arial.ttf", size=14)
+        # Save image
+        timestamp = datetime.now().strftime(DATETIME_FORMAT)
+        image_name = f"{after_data['camera']}_{timestamp}.png"
+        image_path = f"{SNAPSHOT_PATH}/{image_name}"
+        _LOGGER.info(f"Saving image with path: {image_path}")
+        image.save(image_path)
+
+        if config['frigate'].get('draw_box') is False and config['frigate'].get('crop_plate') is False:
+            send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
+
+        if config['frigate'].get('clean_old_images', False):
+            clean_old_images()
 
     if config['frigate'].get('draw_box', False):
+
+        original_plate_number = plate_number
+
+        if watched_plate:
+            plate_number = watched_plate
+        else:
+            plate_number = plate_number
+
+        # get latest Event Data from Frigate API
+        event_url = f"{frigate_url}/api/events/{frigate_event_id}"
+
+        final_attribute = get_final_data(event_url)
+
+        # get latest snapshot
+        snapshot = get_snapshot(frigate_event_id, frigate_url, False)
+        if not snapshot:
+            return
+
+        image = Image.open(io.BytesIO(bytearray(snapshot)))
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype("./Arial.ttf", size=14)
 
         if final_attribute:
             image_width, image_height = image.size
@@ -343,8 +367,42 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             if plate_number:
                 draw.text(((final_attribute[0]['box'][0]*image_width)+5,((final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height)+5), str(plate_number).upper(), font=font)
 
+        # Save image
+        timestamp = datetime.now().strftime(DATETIME_FORMAT)
+        image_name = f"{after_data['camera']}_{timestamp}.png"
+        if plate_number:
+            image_name = f"{str(plate_number).upper()}_{image_name}"
+        image_path = f"{SNAPSHOT_PATH}/{image_name}"
+        _LOGGER.info(f"Saving image with path: {image_path}")
+        image.save(image_path)
+        send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
+
+        if config['frigate'].get('clean_old_images', False):
+            clean_old_images()
+
     # Crop license plate and insert it onto the saved snapshot
     if config['frigate'].get('crop_plate', False):
+
+        original_plate_number = plate_number
+
+        if watched_plate:
+            plate_number = watched_plate
+        else:
+            plate_number = plate_number
+
+        # get latest Event Data from Frigate API
+        event_url = f"{frigate_url}/api/events/{frigate_event_id}"
+
+        final_attribute = get_final_data(event_url)
+
+        # get latest snapshot
+        snapshot = get_snapshot(frigate_event_id, frigate_url, False)
+        if not snapshot:
+            return
+
+        image = Image.open(io.BytesIO(bytearray(snapshot)))
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.truetype("./Arial.ttf", size=14)
 
         margin = 10
         scale_top = config['frigate'].get('scale_top', 1.0)
@@ -411,18 +469,18 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             paste_location = location_mappings.get(crop_location)
             image.paste(resized_plate, paste_location)
 
-    # Save image
-    timestamp = datetime.now().strftime(DATETIME_FORMAT)
-    image_name = f"{after_data['camera']}_{timestamp}.png"
-    if plate_number:
-        image_name = f"{str(plate_number).upper()}_{image_name}"
-    image_path = f"{SNAPSHOT_PATH}/{image_name}"
-    _LOGGER.info(f"Saving image with path: {image_path}")
-    image.save(image_path)
-    send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
+        # Save image
+        timestamp = datetime.now().strftime(DATETIME_FORMAT)
+        image_name = f"{after_data['camera']}_{timestamp}.png"
+        if plate_number:
+            image_name = f"{str(plate_number).upper()}_{image_name}"
+        image_path = f"{SNAPSHOT_PATH}/{image_name}"
+        _LOGGER.info(f"Saving image with path: {image_path}")
+        image.save(image_path)
+        send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
-    if config['frigate'].get('clean_old_images', False):
-        clean_old_images()
+        if config['frigate'].get('clean_old_images', False):
+            clean_old_images()
 
 def check_first_message():
     global first_message
@@ -621,7 +679,7 @@ def on_message(client, userdata, message):
 
         send_mqtt_message(plate_number, plate_score, frigate_event_id, after_data, formatted_start_time, watched_plate, fuzzy_score)
 
-    if plate_number: or config['frigate'].get('always_save_snapshot', False):
+    if plate_number:
         save_image(
             config=config,
             after_data=after_data,

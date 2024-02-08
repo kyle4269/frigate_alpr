@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.1.6'
+VERSION = '2.1.7'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -77,6 +77,7 @@ def send_telegram_notification(image_name, image_path, plate_number, plate_score
     # Format plate numbers and score
     plate_number = plate_number.upper()
     original_plate_number = original_plate_number.upper()
+
     percent_score = f"{plate_score:.1%}" if plate_score is not None else "N/A"
 
     normalized_plate_number = plate_number.replace(" ", "").upper()
@@ -147,11 +148,6 @@ def set_sublabel(frigate_url, frigate_event_id, sublabel, score):
         _LOGGER.error(f"Failed to set sublabel. Status code: {response.status_code}")
 
 def code_project(image):
-    global plate_x_min
-    global plate_y_min
-    global plate_x_max
-    global plate_y_max
-
     api_url = config['code_project'].get('api_url')
 
     response = requests.post(
@@ -341,14 +337,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
                 (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
             )
 
-            # Coordinates from CodeProject.AI
-    #        lic_plate = (
-    #            plate_x_min,
-    #            plate_y_min,
-    #            plate_x_max,
-    #            plate_y_max
-    #        )
-
             draw.rectangle(lic_plate, outline="red", width=2)
             _LOGGER.debug(f"Drawing Plate Box: {lic_plate}")
 
@@ -374,14 +362,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
                 (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
             )
 
-            # Coordinates from CodeProject.AI
-#            lic_plate = (
-#                plate_x_min,
-#                plate_y_min,
-#                plate_x_max,
-#                plate_y_max
-#            )
-#
             plate_coords = lic_plate
             plate = image.crop(plate_coords)
 
@@ -431,7 +411,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             paste_location = location_mappings.get(crop_location)
             image.paste(resized_plate, paste_location)
 
-    # save image
+    # Save image
     timestamp = datetime.now().strftime(DATETIME_FORMAT)
     image_name = f"{after_data['camera']}_{timestamp}.png"
     if plate_number:
@@ -439,7 +419,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
     image_path = f"{SNAPSHOT_PATH}/{image_name}"
     _LOGGER.info(f"Saving image with path: {image_path}")
     image.save(image_path)
-    alert_message = None
     send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
     if config['frigate'].get('clean_old_images', False):
@@ -642,7 +621,7 @@ def on_message(client, userdata, message):
 
         send_mqtt_message(plate_number, plate_score, frigate_event_id, after_data, formatted_start_time, watched_plate, fuzzy_score)
 
-    if plate_number or config['frigate'].get('always_save_snapshot', False):
+    if plate_number: or config['frigate'].get('always_save_snapshot', False):
         save_image(
             config=config,
             after_data=after_data,

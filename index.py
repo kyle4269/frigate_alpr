@@ -766,7 +766,7 @@ def main():
     current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     _LOGGER.info(f"Time: {current_time}")
     _LOGGER.info(f"Python Version: {sys.version}")
-    _LOGGER.info(f"Frigate Plate Recognizer Version: {VERSION}")
+    _LOGGER.info(f"Frigate ALPR Version: {VERSION}")
     _LOGGER.info(f"Telegram Support")
     _LOGGER.debug(f"config: {config}")
 

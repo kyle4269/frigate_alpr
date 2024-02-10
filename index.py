@@ -321,7 +321,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
         _LOGGER.info(f"Saving image with path: {image_path}")
         image.save(image_path)
 
-        if config['frigate'].get('draw_box') is False and config['frigate'].get('crop_plate') is False:
+        if config['frigate'].get('draw_box', False) is False and config['frigate'].get('crop_plate', False) is False:
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
         if config['frigate'].get('clean_old_images', False):

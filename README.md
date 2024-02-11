@@ -17,7 +17,7 @@ frigate:
   mqtt_username: username
   mqtt_password: password
   main_topic: frigate
-  return_topic: plate_recognizer
+  return_topic: frigate_alpr
   frigate_plus: false
   camera:
     - driveway_camera

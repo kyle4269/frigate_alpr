@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.2.0'
+VERSION = '2.2.1'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -70,40 +70,49 @@ def clean_old_images():
     else:
         _LOGGER.info(f"Deleted {num_files_to_delete} files older than {days_to_keep} days.")
 
-def send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number):
+def send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate):
+
     chat_id = config.get('telegram', {}).get('chat_id')
     token = config.get('telegram', {}).get('token')
 
-    # Format plate numbers and score
-    plate_number = plate_number.upper()
-    original_plate_number = original_plate_number.upper()
+    if plate_number:
 
-    percent_score = f"{plate_score:.1%}" if plate_score is not None else "N/A"
+        if watched_plate:
+            plate_number = watched_plate
+        else:
+            plate_number = plate_number
 
-    normalized_plate_number = plate_number.replace(" ", "").upper()
-    normalized_original_plate_number = original_plate_number.replace(" ", "").upper()
+        # Format plate numbers and score
+        plate_number = plate_number.upper()
+        original_plate_number = original_plate_number.upper()
 
-    if normalized_plate_number == normalized_original_plate_number:
-        message = f"Plate: {plate_number} Confidence: {percent_score}"
-    else:
-        message = f"Watched Plate: {plate_number} Confidence: {percent_score} Detected Plate: {original_plate_number}"
 
-    # Decide whether to send a photo or a text message
-    if config.get('telegram', {}).get('sendphoto', False) and image_path:
-        address = f'https://api.telegram.org/bot{token}/sendPhoto'
-        with open(image_path, "rb") as image_file:
-            files = {"photo": image_file}
-            data = {"chat_id": chat_id, "caption": message}
-            response = requests.post(address, files=files, data=data).json()
-    else:
-        url_req = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
-        response = requests.get(url_req).json()
+        percent_score = f"{plate_score:.1%}" if plate_score is not None else "N/A"
 
-    # Log the outcome
-    if response.get("ok"):
-        _LOGGER.debug("Sent to Telegram OK")
-    else:
-        _LOGGER.debug(f"Telegram error: {response}")
+        normalized_plate_number = plate_number.replace(" ", "").upper()
+        normalized_original_plate_number = original_plate_number.replace(" ", "").upper()
+
+        if normalized_plate_number == normalized_original_plate_number:
+            message = f"Plate: {plate_number} Confidence: {percent_score}"
+        else:
+            message = f"Watched Plate: {plate_number} Confidence: {percent_score} Detected Plate: {original_plate_number}"
+
+        # Decide whether to send a photo or a text message
+        if config.get('telegram', {}).get('sendphoto', False) and image_path:
+            address = f'https://api.telegram.org/bot{token}/sendPhoto'
+            with open(image_path, "rb") as image_file:
+                files = {"photo": image_file}
+                data = {"chat_id": chat_id, "caption": message}
+                response = requests.post(address, files=files, data=data).json()
+        else:
+            url_req = f"https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}"
+            response = requests.get(url_req).json()
+
+        # Log the outcome
+        if response.get("ok"):
+            _LOGGER.debug("Sent to Telegram OK")
+        else:
+            _LOGGER.debug(f"Telegram error: {response}")
 
 def on_connect(mqtt_client, userdata, flags, rc):
     _LOGGER.info("MQTT Connected")
@@ -175,6 +184,7 @@ def code_project(image):
     plate_y_max = response['predictions'][0].get('y_max')
 
     watched_plate, watched_score, fuzzy_score = check_watched_plates(plate_number, response['predictions'])
+
     if fuzzy_score:
         return plate_number, score, watched_plate, fuzzy_score
     elif watched_plate:
@@ -202,7 +212,7 @@ def plate_recognizer(image):
 
     if len(response['results']) == 0:
         _LOGGER.debug(f"No plates found")
-        return None, None, None, None
+        return None, None, None
 
     plate_number = response['results'][0].get('plate')
     score = response['results'][0].get('score')
@@ -219,7 +229,7 @@ def check_watched_plates(plate_number, response):
     config_watched_plates = config['frigate'].get('watched_plates', [])
     if not config_watched_plates:
         _LOGGER.debug("Skipping checking Watched Plates because watched_plates is not set")
-        return None, None
+        return None, None, None
 
     config_watched_plates = [str(x).lower() for x in config_watched_plates] #make sure watched_plates are all lower case
 
@@ -323,7 +333,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
 
         # Only send a telegram message IF draw_box and crop_plate is false
         if config['frigate'].get('draw_box', False) is False and config['frigate'].get('crop_plate', False) is False:
-            send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
+            send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
 
         # Limit the amount of times clean_old_images gets called
         if config['frigate'].get('clean_old_images', False):
@@ -335,158 +345,162 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
 
     if config['frigate'].get('draw_box', False):
 
-        original_plate_number = plate_number
-
-        if watched_plate:
-            plate_number = watched_plate
-        else:
-            plate_number = plate_number
-
-        # get latest Event Data from Frigate API
-        event_url = f"{frigate_url}/api/events/{frigate_event_id}"
-
-        final_attribute = get_final_data(event_url)
-
-        # get latest snapshot
-        snapshot = get_snapshot(frigate_event_id, frigate_url, False)
-        if not snapshot:
-            return
-
-        image = Image.open(io.BytesIO(bytearray(snapshot)))
-        draw = ImageDraw.Draw(image)
-        font = ImageFont.truetype("./Arial.ttf", size=14)
-
-        if final_attribute:
-            image_width, image_height = image.size
-
-            # Coordinates from Frigate
-            lic_plate = (
-                final_attribute[0]['box'][0]*image_width,
-                final_attribute[0]['box'][1]*image_height,
-                (final_attribute[0]['box'][0]+final_attribute[0]['box'][2])*image_width,
-                (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
-            )
-
-            draw.rectangle(lic_plate, outline="red", width=2)
-            _LOGGER.debug(f"Drawing Plate Box: {lic_plate}")
-
-            if plate_number:
-                draw.text(((final_attribute[0]['box'][0]*image_width)+5,((final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height)+5), str(plate_number).upper(), font=font)
-
-        # Save image
-        timestamp = datetime.now().strftime(DATETIME_FORMAT)
-        image_name = f"{after_data['camera']}_{timestamp}.png"
         if plate_number:
-            image_name = f"{str(plate_number).upper()}_{image_name}"
-        image_path = f"{SNAPSHOT_PATH}/{image_name}"
-        _LOGGER.info(f"Saving image with path: {image_path}")
-        image.save(image_path)
-        send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
-        if config['frigate'].get('clean_old_images', False):
-            clean_old_images()
+            original_plate_number = plate_number
+
+            if watched_plate:
+                plate_number = watched_plate
+            else:
+                plate_number = plate_number
+
+            # get latest Event Data from Frigate API
+            event_url = f"{frigate_url}/api/events/{frigate_event_id}"
+
+            final_attribute = get_final_data(event_url)
+
+            # get latest snapshot
+            snapshot = get_snapshot(frigate_event_id, frigate_url, False)
+            if not snapshot:
+                return
+
+            image = Image.open(io.BytesIO(bytearray(snapshot)))
+            draw = ImageDraw.Draw(image)
+            font = ImageFont.truetype("./Arial.ttf", size=14)
+
+            if final_attribute:
+                image_width, image_height = image.size
+
+                # Coordinates from Frigate
+                lic_plate = (
+                    final_attribute[0]['box'][0]*image_width,
+                    final_attribute[0]['box'][1]*image_height,
+                    (final_attribute[0]['box'][0]+final_attribute[0]['box'][2])*image_width,
+                    (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
+                )
+
+                draw.rectangle(lic_plate, outline="red", width=2)
+                _LOGGER.debug(f"Drawing Plate Box: {lic_plate}")
+
+                if plate_number:
+                    draw.text(((final_attribute[0]['box'][0]*image_width)+5,((final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height)+5), str(plate_number).upper(), font=font)
+
+            # Save image
+            timestamp = datetime.now().strftime(DATETIME_FORMAT)
+            image_name = f"{after_data['camera']}_{timestamp}.png"
+            if plate_number:
+                image_name = f"{str(plate_number).upper()}_{image_name}"
+            image_path = f"{SNAPSHOT_PATH}/{image_name}"
+            _LOGGER.info(f"Saving image with path: {image_path}")
+            image.save(image_path)
+            send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
+
+            if config['frigate'].get('clean_old_images', False):
+                clean_old_images()
 
     # Crop license plate and insert it onto the saved snapshot
     if config['frigate'].get('crop_plate', False):
 
-        original_plate_number = plate_number
-
-        if watched_plate:
-            plate_number = watched_plate
-        else:
-            plate_number = plate_number
-
-        # get latest Event Data from Frigate API
-        event_url = f"{frigate_url}/api/events/{frigate_event_id}"
-
-        final_attribute = get_final_data(event_url)
-
-        # get latest snapshot
-        snapshot = get_snapshot(frigate_event_id, frigate_url, False)
-        if not snapshot:
-            return
-
-        image = Image.open(io.BytesIO(bytearray(snapshot)))
-        draw = ImageDraw.Draw(image)
-        font = ImageFont.truetype("./Arial.ttf", size=14)
-
-        margin = 10
-        scale_top = config['frigate'].get('scale_top', 1.0)
-        scale_middle = config['frigate'].get('scale_middle', 1.0)
-        scale_bottom = config['frigate'].get('scale_bottom', 1.0)
-
-        if final_attribute:
-            image_width, image_height = image.size
-
-            # Coordinates from Frigate
-            lic_plate = (
-                final_attribute[0]['box'][0]*image_width,
-                final_attribute[0]['box'][1]*image_height,
-                (final_attribute[0]['box'][0]+final_attribute[0]['box'][2])*image_width,
-                (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
-            )
-
-            plate_coords = lic_plate
-            plate = image.crop(plate_coords)
-
-            plate_width, plate_height = plate.size
-            image_height = image.size[1]
-
-            third_of_image = image_height // 3
-
-            if plate_coords[1] + plate_height < third_of_image:
-                # Plate is in the top third
-                scale_factor = scale_top
-                _LOGGER.debug(f"Top Selection Scale: {scale_factor}")
-            elif plate_coords[1] > 2 * third_of_image:
-                # Plate is in the bottom Third
-                scale_factor = scale_bottom
-                _LOGGER.debug(f"Bottom Selection Scale: {scale_factor}")
-            else:
-                scale_factor = scale_middle
-                _LOGGER.debug(f"Middle Selection Scale: {scale_factor}")
-
-            new_plate_width = int(plate_width * scale_factor)
-            new_plate_height = int(plate_height * scale_factor)
-            new_plate_size = (new_plate_width, new_plate_height)
-            resized_plate = plate.resize(new_plate_size, Image.Resampling.LANCZOS)
-
-            original_width, original_height = image.size
-            plate_width, plate_height = plate.size
-
-
-            top_left = (margin, margin)
-            top_right = (original_width - new_plate_width - margin, margin)
-            bottom_left = (margin, original_height - new_plate_height - margin)
-            bottom_right = (original_width - new_plate_width - margin, original_height - new_plate_height - margin)
-
-            image = image.copy()
-
-            crop_location = config['frigate'].get('crop_plate_location', 'bottom_right')
-
-            location_mappings = {
-                'top_left': top_left,
-                'top_right': top_right,
-                'bottom_left': bottom_left,
-                'bottom_right': bottom_right
-            }
-
-            # Use the mapping to get the actual coordinates
-            paste_location = location_mappings.get(crop_location)
-            image.paste(resized_plate, paste_location)
-
-        # Save image
-        timestamp = datetime.now().strftime(DATETIME_FORMAT)
-        image_name = f"{after_data['camera']}_{timestamp}.png"
         if plate_number:
-            image_name = f"{str(plate_number).upper()}_{image_name}"
-        image_path = f"{SNAPSHOT_PATH}/{image_name}"
-        _LOGGER.info(f"Saving image with path: {image_path}")
-        image.save(image_path)
-        send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
-        if config['frigate'].get('clean_old_images', False):
-            clean_old_images()
+            original_plate_number = plate_number
+
+            if watched_plate:
+                plate_number = watched_plate
+            else:
+                plate_number = plate_number
+
+            # get latest Event Data from Frigate API
+            event_url = f"{frigate_url}/api/events/{frigate_event_id}"
+
+            final_attribute = get_final_data(event_url)
+
+            # get latest snapshot
+            snapshot = get_snapshot(frigate_event_id, frigate_url, False)
+            if not snapshot:
+                return
+
+            image = Image.open(io.BytesIO(bytearray(snapshot)))
+            draw = ImageDraw.Draw(image)
+            font = ImageFont.truetype("./Arial.ttf", size=14)
+
+            margin = 10
+            scale_top = config['frigate'].get('scale_top', 1.0)
+            scale_middle = config['frigate'].get('scale_middle', 1.0)
+            scale_bottom = config['frigate'].get('scale_bottom', 1.0)
+
+            if final_attribute:
+                image_width, image_height = image.size
+
+                # Coordinates from Frigate
+                lic_plate = (
+                    final_attribute[0]['box'][0]*image_width,
+                    final_attribute[0]['box'][1]*image_height,
+                    (final_attribute[0]['box'][0]+final_attribute[0]['box'][2])*image_width,
+                    (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
+                )
+
+                plate_coords = lic_plate
+                plate = image.crop(plate_coords)
+
+                plate_width, plate_height = plate.size
+                image_height = image.size[1]
+
+                third_of_image = image_height // 3
+
+                if plate_coords[1] + plate_height < third_of_image:
+                    # Plate is in the top third
+                    scale_factor = scale_top
+                    _LOGGER.debug(f"Top Selection Scale: {scale_factor}")
+                elif plate_coords[1] > 2 * third_of_image:
+                    # Plate is in the bottom Third
+                    scale_factor = scale_bottom
+                    _LOGGER.debug(f"Bottom Selection Scale: {scale_factor}")
+                else:
+                    scale_factor = scale_middle
+                    _LOGGER.debug(f"Middle Selection Scale: {scale_factor}")
+
+                new_plate_width = int(plate_width * scale_factor)
+                new_plate_height = int(plate_height * scale_factor)
+                new_plate_size = (new_plate_width, new_plate_height)
+                resized_plate = plate.resize(new_plate_size, Image.Resampling.LANCZOS)
+
+                original_width, original_height = image.size
+                plate_width, plate_height = plate.size
+
+
+                top_left = (margin, margin)
+                top_right = (original_width - new_plate_width - margin, margin)
+                bottom_left = (margin, original_height - new_plate_height - margin)
+                bottom_right = (original_width - new_plate_width - margin, original_height - new_plate_height - margin)
+
+                image = image.copy()
+
+                crop_location = config['frigate'].get('crop_plate_location', 'bottom_right')
+
+                location_mappings = {
+                    'top_left': top_left,
+                    'top_right': top_right,
+                    'bottom_left': bottom_left,
+                    'bottom_right': bottom_right
+                }
+
+                # Use the mapping to get the actual coordinates
+                paste_location = location_mappings.get(crop_location)
+                image.paste(resized_plate, paste_location)
+
+            # Save image
+            timestamp = datetime.now().strftime(DATETIME_FORMAT)
+            image_name = f"{after_data['camera']}_{timestamp}.png"
+            if plate_number:
+                image_name = f"{str(plate_number).upper()}_{image_name}"
+            image_path = f"{SNAPSHOT_PATH}/{image_name}"
+            _LOGGER.info(f"Saving image with path: {image_path}")
+            image.save(image_path)
+            send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
+
+            if config['frigate'].get('clean_old_images', False):
+                clean_old_images()
 
 def check_first_message():
     global first_message
@@ -685,16 +699,15 @@ def on_message(client, userdata, message):
 
         send_mqtt_message(plate_number, plate_score, frigate_event_id, after_data, formatted_start_time, watched_plate, fuzzy_score)
 
-    if plate_number:
-        save_image(
-            config=config,
-            after_data=after_data,
-            frigate_url=frigate_url,
-            frigate_event_id=frigate_event_id,
-            plate_score=plate_score,
-            plate_number=plate_number,
-            watched_plate=watched_plate
-        )
+    save_image(
+        config=config,
+        after_data=after_data,
+        frigate_url=frigate_url,
+        frigate_event_id=frigate_event_id,
+        plate_score=plate_score,
+        plate_number=plate_number,
+        watched_plate=watched_plate
+    )
 
 def setup_db():
     conn = sqlite3.connect(DB_PATH)
@@ -734,9 +747,9 @@ def run_mqtt_client():
     mqtt_client.on_connect = on_connect
 
     # check if we are using authentication and set username/password if so
-    if config['frigate']['mqtt_auth']:
+    if config['frigate'].get('mqtt_username', False):
         username = config['frigate']['mqtt_username']
-        password = config['frigate']['mqtt_password']
+        password = config['frigate'].get('mqtt_password', '')
         mqtt_client.username_pw_set(username, password)
 
     mqtt_client.connect(config['frigate']['mqtt_server'])

@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '2.1.8'
+VERSION = '2.1.9'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -321,11 +321,17 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
         _LOGGER.info(f"Saving image with path: {image_path}")
         image.save(image_path)
 
+        # Only send a telegram message IF draw_box and crop_plate is false
         if config['frigate'].get('draw_box', False) is False and config['frigate'].get('crop_plate', False) is False:
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number)
 
+        # Limit the amount of times clean_old_images gets called
         if config['frigate'].get('clean_old_images', False):
-            clean_old_images()
+
+            if config['frigate'].get('draw_box', False) or config['frigate'].get('crop_plate', False):
+                _LOGGER.debug("draw_box or crop_plate is true, skipping clean_old_imates")
+            else:
+                clean_old_images()
 
     if config['frigate'].get('draw_box', False):
 

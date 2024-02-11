@@ -42,7 +42,7 @@ action:
       watch_license_plate: !input watch_license_plate
       alert_reason: !input alert_reason
   - condition: template
-    value_template: "{{ plate_number|string == watch_license_plate|string }}"
+    value_template: "{{ (plate_number | string).replace(' ', '') == (watch_license_plate | string).replace(' ', '') }}"
   - device_id: !input notify_service
     domain: mobile_app
     type: notify

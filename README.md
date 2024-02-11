@@ -175,4 +175,4 @@ If no candidates match and fuzzy_match is enabled with a value, the recognized p
 
 This blueprint will allow you to set a license plate you want to be alerted on and send a notification to a mobile device of your choice.
 
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkyle4269%2Ffrigate_alpr%2Fblob%2Fmain%2Fblueprint%2Falert_plates)
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkyle4269%2Ffrigate_alpr%2Fblob%2Fmain%2Fblueprint%2Falert_plates.yaml)

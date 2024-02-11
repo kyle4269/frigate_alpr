@@ -17,7 +17,7 @@ frigate:
   mqtt_username: username
   mqtt_password: password
   main_topic: frigate
-  return_topic: plate_recognizer
+  return_topic: frigate_alpr
   frigate_plus: false
   camera:
     - driveway_camera
@@ -173,6 +173,6 @@ If no candidates match and fuzzy_match is enabled with a value, the recognized p
 
 ### Home Assistant Blueprint
 
-This blueprint lets you to designate a specific license plate for monitoring, allowingg you to receive alerts directly on your mobile device whenever it is detected.
+This blueprint lets you to designate a specific license plate for monitoring, allowing you to receive alerts directly on your mobile device whenever it is detected.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fkyle4269%2Ffrigate_alpr%2Fblob%2Fmain%2Fblueprint%2Falert_plates.yaml)

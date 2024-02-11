@@ -2,7 +2,7 @@ blueprint:
   name: Frigate ALPR Notification (v1.0.1)
   description: Send a notification when a specific license plate is detected.
   domain: automation
-  source_url: https://github.com/kyle4269/frigate_alpr/blob/main/blueprint/alert_plates
+  source_url: https://github.com/kyle4269/frigate_alpr/blob/main/blueprint/alert_plates.yaml
   input:
     mqtt_topic:
       name: MQTT Topic

@@ -159,38 +159,44 @@ def set_sublabel(frigate_url, frigate_event_id, sublabel, score):
 def code_project(image):
     api_url = config['code_project'].get('api_url')
 
-    response = requests.post(
-        api_url,
-        files=dict(upload=image),
-    )
-    response = response.json()
-    _LOGGER.debug(f"response: {response}")
+    try:
+        response = requests.post(api_url,files=dict(upload=image))
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        response = response.json()
+        _LOGGER.debug(f"response: {response}")
 
-    if response.get('predictions') is None:
-        _LOGGER.error(f"Failed to get plate number. Response: {response}")
+        if response.get('predictions') is None:
+            _LOGGER.error(f"Failed to get plate number. Response: {response}")
+            return None, None, None, None
+
+        if len(response['predictions']) == 0:
+            _LOGGER.debug(f"No plates found")
+            return None, None, None, None
+
+        plate_number = response['predictions'][0].get('plate')
+        score = response['predictions'][0].get('confidence')
+
+        #get license plate coordinates
+        plate_x_min = response['predictions'][0].get('x_min')
+        plate_y_min = response['predictions'][0].get('y_min')
+        plate_x_max = response['predictions'][0].get('x_max')
+        plate_y_max = response['predictions'][0].get('y_max')
+
+        watched_plate, watched_score, fuzzy_score = check_watched_plates(plate_number, response['predictions'])
+
+        if fuzzy_score:
+            return plate_number, score, watched_plate, fuzzy_score
+        elif watched_plate:
+            return plate_number, watched_score, watched_plate, None
+        else:
+            return plate_number, score, None, None
+
+    except requests.exceptions.ConnectionError as e:
+        _LOGGER.error("Connection failed! {}".format(e))
         return None, None, None, None
-
-    if len(response['predictions']) == 0:
-        _LOGGER.debug(f"No plates found")
+    except Exception as e:
+        _LOGGER.error("An error occurred: {}".format(e))
         return None, None, None, None
-
-    plate_number = response['predictions'][0].get('plate')
-    score = response['predictions'][0].get('confidence')
-
-    #get license plate coordinates
-    plate_x_min = response['predictions'][0].get('x_min')
-    plate_y_min = response['predictions'][0].get('y_min')
-    plate_x_max = response['predictions'][0].get('x_max')
-    plate_y_max = response['predictions'][0].get('y_max')
-
-    watched_plate, watched_score, fuzzy_score = check_watched_plates(plate_number, response['predictions'])
-
-    if fuzzy_score:
-        return plate_number, score, watched_plate, fuzzy_score
-    elif watched_plate:
-        return plate_number, watched_score, watched_plate, None
-    else:
-        return plate_number, score, None, None
 
 def plate_recognizer(image):
     api_url = config['plate_recognizer'].get('api_url') or PLATE_RECOGIZER_BASE_URL

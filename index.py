@@ -339,7 +339,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
         if config['frigate'].get('clean_old_images', False):
 
             if config['frigate'].get('draw_box', False) or config['frigate'].get('crop_plate', False):
-                _LOGGER.debug("draw_box or crop_plate is true, skipping clean_old_imates")
+                _LOGGER.debug("draw_box or crop_plate is true, skipping clean_old_images")
             else:
                 clean_old_images()
 

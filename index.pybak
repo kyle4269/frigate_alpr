@@ -334,15 +334,8 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
         timestamp = datetime.now().strftime(DATETIME_FORMAT)
         image_name = f"{after_data['camera']}_{timestamp}.png"
         image_path = f"{SNAPSHOT_PATH}/{image_name}"
-
-        # Avoid a crash if the shared folder is no longer available
-        try:
-            image.save(image_path)
-        except OSError as e:
-            if "Key has been revoked" in str(e):
-                _LOGGER.error("Failed to save image, likely due to the shared folder no longer being available: %s", image_path)
-        else:
-                _LOGGER.info(f"Saving image with path: {image_path}")
+        _LOGGER.info(f"Saving image with path: {image_path}")
+        image.save(image_path)
 
         # Only send a telegram message IF draw_box and crop_plate is false
         if config['frigate'].get('draw_box', False) is False and config['frigate'].get('crop_plate', False) is False:
@@ -404,17 +397,8 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             if plate_number:
                 image_name = f"{str(plate_number).upper()}_{image_name}"
             image_path = f"{SNAPSHOT_PATH}/{image_name}"
-
-            # Avoid a crash if the shared folder is no longer available
-            try:
-                image.save(image_path)
-            except OSError as e:
-                if "Key has been revoked" in str(e):
-                    _LOGGER.error("Failed to save image, likely due to the shared folder no longer being available: %s", image_path)
-                    return
-            else:
-                    _LOGGER.info(f"Saving image with path: {image_path}")
-
+            _LOGGER.info(f"Saving image with path: {image_path}")
+            image.save(image_path)
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
 
             if config['frigate'].get('clean_old_images', False):
@@ -517,18 +501,8 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             if plate_number:
                 image_name = f"{str(plate_number).upper()}_{image_name}"
             image_path = f"{SNAPSHOT_PATH}/{image_name}"
-
-
-            # Avoid a crash if the shared folder is no longer available
-            try:
-                image.save(image_path)
-            except OSError as e:
-                if "Key has been revoked" in str(e):
-                    _LOGGER.error("Failed to save image, likely due to the shared folder no longer being available: %s", image_path)
-                    return
-            else:
-                    _LOGGER.info(f"Saving image with path: {image_path}")
-
+            _LOGGER.info(f"Saving image with path: {image_path}")
+            image.save(image_path)
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
 
             if config['frigate'].get('clean_old_images', False):

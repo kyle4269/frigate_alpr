@@ -1,0 +1,66 @@
+blueprint:
+  name: Frigate ALPR Notification (v1.0.2)
+  description: Send a notification when a specific license plate is detected.
+  domain: automation
+  input:
+    mqtt_topic:
+      name: MQTT Topic
+      description: The MQTT topic to listen to for ALPR events.
+      default: frigate/frigate_alpr
+    watch_license_plate:
+      name: Alert License Plate
+      description: The license plate number to watch for.
+      selector:
+        text:
+    notify_service:
+      name: Mobile Notification
+      description: The mobile device to notify.
+      selector:
+        device:
+          integration: mobile_app
+    alert_reason:
+      name: Alert Reason
+      description: Reason for the alert.
+      selector:
+        text:
+    message_template:
+      name: Message
+      description: The message to send when the watched license plate is detected. Create your own message using {{ plate_number }} and {{ alert_reason }}
+      default: "Alert license plate detected: {{ plate_number }} Reason: {{ alert_reason }}"
+      selector:
+        text:
+    critical_notification:
+      name: Critical Notifications (iOS)
+      description: Send as a critical notification.This will play a sound even if Do Not Disturb is enabled or the iPhone is muted.
+      default: false
+      selector:
+        boolean:
+
+trigger:
+  platform: mqtt
+  topic: !input mqtt_topic
+
+action:
+  - variables:
+      payload: "{{ trigger.payload_json }}"
+      plate_number: "{{ payload.plate_number }}"
+      watch_license_plate: !input watch_license_plate
+      alert_reason: !input alert_reason
+      critical_notification: !input critical_notification
+  - condition: template
+    value_template: "{{ (plate_number | string).replace(' ', '') == (watch_license_plate | string).replace(' ', '') }}"
+  - device_id: !input notify_service
+    domain: mobile_app
+    type: notify
+    title: "License Plate Detected"
+    message: !input message_template
+    data:
+      tag: "ALPR_NOTIFICATION"
+      push:
+        sound:
+          name: "default"
+          critical: "{{ 1 if critical_notification else 0 }}"
+          volume: 1.0
+
+
+mode: single

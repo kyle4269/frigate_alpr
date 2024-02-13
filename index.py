@@ -39,7 +39,7 @@ CURRENT_EVENTS = {}
 def clean_old_images():
     folder_path = SNAPSHOT_PATH
     try:
-        days_to_keep = int(config['frigate'].get('days_of_snapshots', 0))
+        days_to_keep = int(config['frigate'].get('days_of_snapshots', 30))
     except ValueError:
         _LOGGER.error("Invalid 'days_of_snapshots' value in config.yaml, must be an integer.")
         return
@@ -194,6 +194,14 @@ def code_project(image):
     except requests.exceptions.ConnectionError as e:
         _LOGGER.error("Connection failed! {}".format(e))
         return None, None, None, None
+    except requests.exceptions.Timeout as e:
+        # Handle Timeout errors
+        _LOGGER.error("Request timed out: {}".format(e))
+        return None, None, None, None
+    except requests.exceptions.RequestException as e:
+        # Handle ambiguous exception that occurred while handling your request
+        _LOGGER.error("A requests exception occurred: {}".format(e))
+        return None, None, None, None
     except Exception as e:
         _LOGGER.error("An error occurred: {}".format(e))
         return None, None, None, None
@@ -202,34 +210,45 @@ def plate_recognizer(image):
     api_url = config['plate_recognizer'].get('api_url') or PLATE_RECOGIZER_BASE_URL
     token = config['plate_recognizer']['token']
 
-    response = requests.post(
-        api_url,
-        data=dict(regions=config['plate_recognizer']['regions']),
-        files=dict(upload=image),
-        headers={'Authorization': f'Token {token}'}
-    )
+    try:
+        response = requests.post(api_url,data=dict(regions=config['plate_recognizer']['regions']),files=dict(upload=image),headers={'Authorization': f'Token {token}'})
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        response = response.json()
+        _LOGGER.debug(f"response: {response}")
 
-    response = response.json()
-    _LOGGER.debug(f"response: {response}")
+        if response.get('results') is None:
+            _LOGGER.error(f"Failed to get plate number. Response: {response}")
+            return None, None, None, None
 
-    if response.get('results') is None:
-        _LOGGER.error(f"Failed to get plate number. Response: {response}")
+        if len(response['results']) == 0:
+            _LOGGER.debug(f"No plates found")
+            return None, None, None
+
+        plate_number = response['results'][0].get('plate')
+        score = response['results'][0].get('score')
+
+        watched_plate, watched_score, fuzzy_score = check_watched_plates(plate_number, response['results'][0].get('candidates'))
+        if fuzzy_score:
+            return plate_number, score, watched_plate, fuzzy_score
+        elif watched_plate:
+            return plate_number, watched_score, watched_plate, None
+        else:
+            return plate_number, score, None, None
+
+    except requests.exceptions.ConnectionError as e:
+        _LOGGER.error("Connection failed! {}".format(e))
         return None, None, None, None
-
-    if len(response['results']) == 0:
-        _LOGGER.debug(f"No plates found")
-        return None, None, None
-
-    plate_number = response['results'][0].get('plate')
-    score = response['results'][0].get('score')
-
-    watched_plate, watched_score, fuzzy_score = check_watched_plates(plate_number, response['results'][0].get('candidates'))
-    if fuzzy_score:
-        return plate_number, score, watched_plate, fuzzy_score
-    elif watched_plate:
-        return plate_number, watched_score, watched_plate, None
-    else:
-        return plate_number, score, None, None
+    except requests.exceptions.Timeout as e:
+        # Handle Timeout errors
+        _LOGGER.error("Request timed out: {}".format(e))
+        return None, None, None, None
+    except requests.exceptions.RequestException as e:
+        # Handle ambiguous exception that occurred while handling your request
+        _LOGGER.error("A requests exception occurred: {}".format(e))
+        return None, None, None, None
+    except Exception as e:
+        _LOGGER.error("An error occurred: {}".format(e))
+        return None, None, None, None
 
 def check_watched_plates(plate_number, response):
     config_watched_plates = config['frigate'].get('watched_plates', [])

@@ -13,7 +13,6 @@ Create a `config.yml` file in your docker volume with the following contents:
 frigate:
   frigate_url: http://127.0.0.1:5000
   mqtt_server: 127.0.0.1
-  mqtt_auth: false
   mqtt_username: username
   mqtt_password: password
   main_topic: frigate
@@ -133,15 +132,17 @@ frigate:
 ### Clean Saved Snapshots
 **DISCLAIMER:**
 
+** PLEASE READ!!**
+
 **THIS WILL DELETE SNAPSHOTS!!**
 
-**INCLUDING SNAPSHOTS YOU ALREADY HAVE THAT ARE OLDER THAN X DAYS!!**
+**INCLUDING ANY EXISTING SNAPSHOTS THAT ARE OLDER THAN THE SPECIFIED NUMBER OF DAYS (days_of_snapshots)!!**
 
 If you want to only keep X days of snapshots, add the following to your config.yaml:
 ```yml
 frigate:
   clean_old_images: True
-  days_of_snapshots: 30
+  days_of_snapshots: 30 # Default if you don't set your own.
 ```
 
 ### Telegram Support

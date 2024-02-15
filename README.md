@@ -132,7 +132,7 @@ frigate:
 ### Clean Saved Snapshots
 **DISCLAIMER:**
 
-** PLEASE READ!!**
+**PLEASE READ!!**
 
 **THIS WILL DELETE SNAPSHOTS!!**
 
@@ -153,7 +153,7 @@ If you want to send the saved snapshot to telegram, add the following to your co
 telegram:
   token: "XXXXXXX"
   chat_id: "XXXXXXXX"
-  sendphoto: True # Setting this to False will still send a message to Telegram with the Plate Number and Score.
+  send_photo: True # Setting this to False will still send a message to Telegram with the Plate Number and Score.
 ```
 
 ### Monitor Watched Plates

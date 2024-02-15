@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.2.5'
+VERSION = '1.3.0'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -98,7 +98,7 @@ def send_telegram_notification(image_name, image_path, plate_number, plate_score
             message = f"Watched Plate: {plate_number} Confidence: {percent_score} Detected Plate: {original_plate_number}"
 
         # Decide whether to send a photo or a text message
-        if config.get('telegram', {}).get('sendphoto', False) and image_path:
+        if config.get('telegram', {}).get('send_photo', False) and image_path:
             address = f'https://api.telegram.org/bot{token}/sendPhoto'
             with open(image_path, "rb") as image_file:
                 files = {"photo": image_file}
@@ -434,6 +434,15 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             else:
                     _LOGGER.info(f"Saving image with path: {image_path}")
 
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+
+            # Now, update the has_image column for the row with last_row_id
+            cursor.execute("""UPDATE plates SET has_image = ? WHERE id = ?""", (image_name, last_row_id))
+
+            conn.commit()
+            conn.close()
+
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
 
             if config['frigate'].get('clean_old_images', False):
@@ -547,6 +556,15 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
                     return
             else:
                     _LOGGER.info(f"Saving image with path: {image_path}")
+
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+
+            # Now, update the has_image column for the row with last_row_id
+            cursor.execute("""UPDATE plates SET has_image = ? WHERE id = ?""", (image_name, last_row_id))
+
+            conn.commit()
+            conn.close()
 
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
 
@@ -681,6 +699,8 @@ def get_plate(snapshot):
     return plate_number, plate_score, watched_plate, fuzzy_score
 
 def store_plate_in_db(plate_number, plate_score, frigate_event_id, after_data, formatted_start_time):
+    global last_row_id
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -689,6 +709,8 @@ def store_plate_in_db(plate_number, plate_score, frigate_event_id, after_data, f
     cursor.execute("""INSERT INTO plates (detection_time, score, plate_number, frigate_event, camera_name) VALUES (?, ?, ?, ?, ?)""",
         (formatted_start_time, plate_score, plate_number, frigate_event_id, after_data['camera'])
     )
+    # Retrieve last row ID
+    last_row_id = cursor.lastrowid
 
     conn.commit()
     conn.close()
@@ -762,6 +784,7 @@ def on_message(client, userdata, message):
 
 def setup_db():
     conn = sqlite3.connect(DB_PATH)
+
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS plates (
@@ -770,7 +793,8 @@ def setup_db():
             score TEXT NOT NULL,
             plate_number TEXT NOT NULL,
             frigate_event TEXT NOT NULL UNIQUE,
-            camera_name TEXT NOT NULL
+            camera_name TEXT NOT NULL,
+            has_image TEXT
         )
     """)
     conn.commit()

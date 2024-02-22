@@ -2,7 +2,7 @@
 
 Identify license plates via [Plate Recognizer](https://guides.platerecognizer.com/) or [CodeProject.AI](https://www.codeproject.com/) and add them as sublabels to [blakeblackshear/frigate](https://github.com/blakeblackshear/frigate)
 
-**This majority of this code is from [Frigate_Plate_recognizer](https://github.com/ljmerza/frigate_plate_recognizer), written by [Leonardo Merza](https://github.com/ljmerza) and [gadget-man](https://github.com/gadget-man). I just added my own tweaks and functions.**
+**This majority of this code is from [Frigate_Plate_recognizer](https://github.com/ljmerza/frigate_plate_recognizer). I just added my own tweaks and functions.**
 
 
 ### Setup
@@ -171,6 +171,10 @@ frigate:
 If a watched plate is found in the list of candidates plates returned by plate-recognizer / CP.AI, the response will be updated to use that plate and its score. The original plate will be added to the MQTT response as an additional `original_plate` field.
 
 If no candidates match and fuzzy_match is enabled with a value, the recognized plate is compared against each of the watched_plates using fuzzy matching. If a plate is found with a score > fuzzy_match, the response will be updated with that plate. The original plate and the associated fuzzy_score will be added to the MQTT response as additional fields `original_plate` and `fuzzy_score`.
+
+### Flask Web App
+
+I've also created a Web Application from Flask. If you'd like to use that with Frigate_ALPR, see [Frigate_ALPR_Web](https://github.com/kyle4269/frigate_alpr_web).
 
 ### Home Assistant Blueprint
 

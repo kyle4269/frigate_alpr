@@ -5,7 +5,7 @@ Identify license plates via [Plate Recognizer](https://guides.platerecognizer.co
 **The core foundation of this code is based on the exceptional work found in  [Frigate_Plate_recognizer](https://github.com/ljmerza/frigate_plate_recognizer). I have contributed by integrating my own modifications and enhancements to further refine its functionality.**
 
 
-### Setup
+## Setup
 
 Create a `config.yml` file in your docker volume with the following contents:
 
@@ -77,7 +77,7 @@ code_project:
   api_url: http://127.0.0.1:32168/v1/image/alpr
 ```
 
-### Debugging
+## Debugging
 
 set `logger_level` in your config to `DEBUG` to see more logging information:
 
@@ -87,7 +87,7 @@ logger_level: DEBUG
 
 Logs will be in `/config/frigate_plate_recognizer.log`
 
-### Save Snapshot Images to Path
+## Save Snapshot Images to Path
 
 If you want frigate-plate-recognizer to automatically save snapshots of recognized plates, add the following to your config.yml:
 
@@ -99,7 +99,7 @@ frigate:
 
 Snapshots will be saved into the '/plates' directory within your container - to access them directly, map an additional volume within your docker-compose, e.g.:
 
-### Running
+## Running
 ```bash
 docker run -v /path/to/config:/config /path/to/plates:/plates:rw -e TZ=America/New_York -it --rm --name frigate_alpr kyle4269/frigate_alpr:latest
 ```
@@ -117,7 +117,7 @@ services:
       - TZ=America/New_York
 ```
 
-### Crop License Plate
+## Crop License Plate
 
 If you want to crop the license plate and have it added the the saved snapshot, add the following to your config.yaml:
 ```yml
@@ -129,7 +129,7 @@ frigate:
   scale_bottom: 2.0 # If detected in the bottom third of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
 ```
 
-### Clean Saved Snapshots
+## Clean Saved Snapshots
 **DISCLAIMER:**
 
 **PLEASE READ!!**
@@ -145,7 +145,7 @@ frigate:
   days_of_snapshots: 30 # Default if you don't set your own.
 ```
 
-### Telegram Support
+## Telegram Support
 
 If you want to send the saved snapshot to telegram, add the following to your config.yaml:
 
@@ -156,7 +156,7 @@ telegram:
   send_photo: True # Setting this to False will still send a message to Telegram with the Plate Number and Score.
 ```
 
-### Monitor Watched Plates
+## Monitor Watched Plates
 
 If you want frigate-plate-recognizer to check recognized plates against a list of watched plates for close matches (including fuzzy recognition), add the following to your config.yml:
 
@@ -172,11 +172,11 @@ If a watched plate is found in the list of candidates plates returned by plate-r
 
 If no candidates match and fuzzy_match is enabled with a value, the recognized plate is compared against each of the watched_plates using fuzzy matching. If a plate is found with a score > fuzzy_match, the response will be updated with that plate. The original plate and the associated fuzzy_score will be added to the MQTT response as additional fields `original_plate` and `fuzzy_score`.
 
-### Flask Web App
+## Flask Web App
 
-I've also created a Web Application from Flask. If you'd like to use that with Frigate_ALPR, see [Frigate_ALPR_Web](https://github.com/kyle4269/frigate_alpr_web).
+Additionally, I've developed a simple Web Application using Flask to complement Frigate_ALPR. For those interested in integrating this web interface, please explore [Frigate_ALPR_Web](https://github.com/kyle4269/frigate_alpr_web) for more details and setup instructions.
 
-### Home Assistant Blueprint
+## Home Assistant Blueprint
 
 This blueprint lets you to designate a specific license plate for monitoring, allowing you to receive alerts directly on your mobile device whenever it is detected.
 

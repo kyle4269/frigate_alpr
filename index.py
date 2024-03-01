@@ -622,7 +622,7 @@ def get_snapshot(frigate_event_id, frigate_url, cropped):
 def get_cropped_snapshot(frigate_event_id, frigate_url):
     _LOGGER.debug(f"Getting snapshot for event: {frigate_event_id}")
     snapshot_url = f"{frigate_url}/api/events/{frigate_event_id}/snapshot.jpg"
-    _LOGGER.info(f"event URL: {snapshot_url}")
+    _LOGGER.debug(f"event URL: {snapshot_url}")
 
     # get snapshot
     response = requests.get(snapshot_url)

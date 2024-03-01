@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.1'
+VERSION = '1.3.2'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -619,6 +619,66 @@ def get_snapshot(frigate_event_id, frigate_url, cropped):
 
     return response.content
 
+def get_cropped_snapshot(frigate_event_id, frigate_url):
+    _LOGGER.debug(f"Getting snapshot for event: {frigate_event_id}")
+    snapshot_url = f"{frigate_url}/api/events/{frigate_event_id}/snapshot.jpg"
+    _LOGGER.info(f"event URL: {snapshot_url}")
+
+    # get snapshot
+    response = requests.get(snapshot_url)
+    image = Image.open(io.BytesIO(response.content))
+
+    # get latest Event Data from Frigate API
+    event_url = f"{frigate_url}/api/events/{frigate_event_id}"
+
+    final_attribute = get_final_data(event_url)
+
+    if final_attribute:
+        image_width, image_height = image.size
+
+        # Coordinates from Frigate
+        lic_plate = (
+            final_attribute[0]['box'][0]*image_width,
+            final_attribute[0]['box'][1]*image_height,
+            (final_attribute[0]['box'][0]+final_attribute[0]['box'][2])*image_width,
+            (final_attribute[0]['box'][1]+final_attribute[0]['box'][3])*image_height
+        )
+
+        lic_plate_coords = lic_plate
+
+    # Check if the request was successful (HTTP status code 200)
+    if response.status_code != 200:
+        _LOGGER.error(f"Error getting snapshot: {response.status_code}")
+        return
+
+    desired_width = 1000
+    desired_height = 1000
+
+    # Calculate current width and height
+    current_width = lic_plate[2] - lic_plate[0]
+    current_height = lic_plate[3] - lic_plate[1]
+
+    # Calculate how much to expand (or contract) on each side
+    expand_width = (desired_width - current_width) / 2
+    expand_height = (desired_height - current_height) / 2
+
+    # Adjust the bounding box, ensuring it does not go beyond image boundaries
+    expanded_lic_plate = (
+        max(lic_plate[0] - expand_width, 0),
+        max(lic_plate[1] - expand_height, 0),
+        min(lic_plate[2] + expand_width, image_width),
+        min(lic_plate[3] + expand_height, image_height)
+    )
+
+    cropped_image = image.crop(expanded_lic_plate)
+
+    # Convert the cropped image back to bytes
+    cropped_image_bytes = io.BytesIO()
+    cropped_image.save(cropped_image_bytes, format="PNG")
+    cropped_image_bytes.seek(0)
+
+    return cropped_image_bytes.getvalue()
+
 def get_license_plate_attribute(after_data):
     if config['frigate'].get('frigate_plus', False):
         attributes = after_data.get('current_attributes', [])
@@ -645,6 +705,17 @@ def get_final_data(event_url):
 
     else:
         return None
+
+def get_vehicle_data(event_url):
+    response = requests.get(event_url)
+    if response.status_code != 200:
+        _LOGGER.error(f"Error getting final data: {response.status_code}")
+        return
+    event_json = response.json()
+    event_data = event_json['data']['box']
+    final_attribute = event_data
+
+    return final_attribute
 
 def is_valid_license_plate(after_data):
     # if user has frigate plus then check license plate attribute
@@ -747,7 +818,11 @@ def on_message(client, userdata, message):
     if not type == 'end' and not after_data['id'] in CURRENT_EVENTS:
         CURRENT_EVENTS[frigate_event_id] =  0
 
-    snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+    if config['frigate'].get('detector_crop', False):
+        snapshot = get_cropped_snapshot(frigate_event_id, frigate_url)
+    else:
+        snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+
     if not snapshot:
         del CURRENT_EVENTS[frigate_event_id] # remove existing id from current events due to snapshot failure - will try again next frame
         return

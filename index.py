@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.2'
+VERSION = '1.3.3'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -823,8 +823,13 @@ def on_message(client, userdata, message):
     else:
         snapshot = get_snapshot(frigate_event_id, frigate_url, True)
 
+
     if not snapshot:
-        del CURRENT_EVENTS[frigate_event_id] # remove existing id from current events due to snapshot failure - will try again next frame
+        # Check if the key exists in the dictionary before attempting to delete
+        if frigate_event_id in CURRENT_EVENTS:
+            del CURRENT_EVENTS[frigate_event_id]
+        else:
+            _LOGGER.debug(f"Key {frigate_event_id} not found in CURRENT_EVENTS.") 
         return
 
     _LOGGER.debug(f"Getting plate for event: {frigate_event_id}")

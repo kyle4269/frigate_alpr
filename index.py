@@ -23,7 +23,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.2'
+VERSION = '1.3.3'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -622,7 +622,7 @@ def get_snapshot(frigate_event_id, frigate_url, cropped):
 def get_cropped_snapshot(frigate_event_id, frigate_url):
     _LOGGER.debug(f"Getting snapshot for event: {frigate_event_id}")
     snapshot_url = f"{frigate_url}/api/events/{frigate_event_id}/snapshot.jpg"
-    _LOGGER.info(f"event URL: {snapshot_url}")
+    _LOGGER.debug(f"event URL: {snapshot_url}")
 
     # get snapshot
     response = requests.get(snapshot_url)
@@ -818,13 +818,17 @@ def on_message(client, userdata, message):
     if not type == 'end' and not after_data['id'] in CURRENT_EVENTS:
         CURRENT_EVENTS[frigate_event_id] =  0
 
-    if config['frigate'].get('detector_crop', False):
-        snapshot = get_cropped_snapshot(frigate_event_id, frigate_url)
-    else:
-        snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+#    if config['frigate'].get('detector_crop', False):
+#        snapshot = get_cropped_snapshot(frigate_event_id, frigate_url)
+#    else:
 
+    snapshot = get_snapshot(frigate_event_id, frigate_url, True)
     if not snapshot:
-        del CURRENT_EVENTS[frigate_event_id] # remove existing id from current events due to snapshot failure - will try again next frame
+        # Check if the key exists in the dictionary before attempting to delete
+        if frigate_event_id in CURRENT_EVENTS:
+            del CURRENT_EVENTS[frigate_event_id]
+        else:
+            _LOGGER.debug(f"Key {frigate_event_id} not found in CURRENT_EVENTS.") 
         return
 
     _LOGGER.debug(f"Getting plate for event: {frigate_event_id}")

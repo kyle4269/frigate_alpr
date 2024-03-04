@@ -64,7 +64,6 @@ frigate:
   frigate_plus: true
   license_plate_min_score: 0 # default is show all but can speficify a min score from 0 - 1 for example 0.8
   max_attempts: 20 # Optional: if set, will limit the number of snapshots sent for recognition for any particular event. 
-  detector_crop: False # Crop the image sent to CPAI or plate recognizer. 1000x1000 around license plate
 ```
 
 If you're using CodeProject.AI, you'll need to comment out plate_recognizer in your config. Then add and update "api_url" with your CodeProject.AI Service API URL. Your config should look like:

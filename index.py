@@ -818,12 +818,11 @@ def on_message(client, userdata, message):
     if not type == 'end' and not after_data['id'] in CURRENT_EVENTS:
         CURRENT_EVENTS[frigate_event_id] =  0
 
-    if config['frigate'].get('detector_crop', False):
-        snapshot = get_cropped_snapshot(frigate_event_id, frigate_url)
-    else:
-        snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+#    if config['frigate'].get('detector_crop', False):
+#        snapshot = get_cropped_snapshot(frigate_event_id, frigate_url)
+#    else:
 
-
+    snapshot = get_snapshot(frigate_event_id, frigate_url, True)
     if not snapshot:
         # Check if the key exists in the dictionary before attempting to delete
         if frigate_event_id in CURRENT_EVENTS:

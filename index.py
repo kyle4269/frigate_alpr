@@ -14,6 +14,7 @@ import json
 import requests
 import io
 
+from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, UnidentifiedImageError, ImageFont
 from thefuzz import fuzz
 from thefuzz import process
@@ -36,8 +37,42 @@ PLATE_RECOGIZER_BASE_URL = 'https://api.platerecognizer.com/v1/plate-reader'
 DEFAULT_OBJECTS = ['car', 'motorcycle', 'bus']
 CURRENT_EVENTS = {}
 
-def clean_old_images():
-    folder_path = SNAPSHOT_PATH
+def run_daily():
+
+    directory = SNAPSHOT_PATH
+
+    # Today's date
+    today = datetime.now().date()
+
+    # File to store the last run date
+    last_run_file = os.path.join(directory, "last_run.txt")
+
+    # Read the last run date
+    if os.path.exists(last_run_file):
+        with open(last_run_file, "r") as file:
+            last_run_data = file.read().strip()  # Strip whitespace from the read data
+            try:
+                last_run_date = datetime.strptime(last_run_data, '%Y-%m-%d').date()
+            except ValueError:
+                _LOGGER.error("Error parsing date from last_run.txt. Contents: '%s'", last_run_data)
+                last_run_date = today - timedelta(days=1)
+    else:
+        last_run_date = today - timedelta(days=1)
+
+    # Check if the function ran today
+    if last_run_date < today:
+        _LOGGER.debug("delete_old_images has not run today. Running now.")
+        # Run the function
+        delete_old_images()
+
+        # Update the last run date
+        with open(last_run_file, "w") as file:
+            file.write(str(today))
+    else:
+            _LOGGER.debug("delete_old_images has already run today. Skipping.")
+
+def delete_old_images():
+    directory = SNAPSHOT_PATH
     try:
         days_to_keep = int(config['frigate'].get('days_of_snapshots', 30))
     except ValueError:
@@ -45,7 +80,7 @@ def clean_old_images():
         return
 
     if days_to_keep <= 0:
-        _LOGGER.error("days_of_snapshots not in config.yaml or invalid, skipping clean_old_images!")
+        _LOGGER.error("days_of_snapshots not in config.yaml or invalid, skipping delete_old_images!")
         return
 
     extension = 'png'
@@ -53,9 +88,9 @@ def clean_old_images():
     threshold_time = current_time - days_to_keep * 86400  # seconds in a day
     num_files_to_delete = 0
 
-    for filename in os.listdir(folder_path):
+    for filename in os.listdir(directory):
         if filename.endswith(extension):
-            file_path = os.path.join(folder_path, filename)
+            file_path = os.path.join(directory, filename)
             file_time = os.path.getmtime(file_path)
 
             if file_time < threshold_time:
@@ -66,9 +101,9 @@ def clean_old_images():
                     _LOGGER.error(f"Error deleting file {file_path}: {e}")
 
     if num_files_to_delete == 0:
-        _LOGGER.info("No files need to be deleted.")
+        _LOGGER.info("File Cleanup: No files older than %d days found, deletion not required.", days_to_keep)
     else:
-        _LOGGER.info(f"Deleted {num_files_to_delete} files older than {days_to_keep} days.")
+        _LOGGER.info(f"File Cleanup: Successfully deleted %d files older than %d days.", num_files_to_delete, days_to_keep)
 
 def send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate):
 
@@ -367,14 +402,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
         if config['frigate'].get('draw_box', False) is False and config['frigate'].get('crop_plate', False) is False:
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
 
-        # Limit the amount of times clean_old_images gets called
-        if config['frigate'].get('clean_old_images', False):
-
-            if config['frigate'].get('draw_box', False) or config['frigate'].get('crop_plate', False):
-                _LOGGER.debug("draw_box or crop_plate is true, skipping clean_old_images")
-            else:
-                clean_old_images()
-
     if config['frigate'].get('draw_box', False):
 
         if plate_number:
@@ -444,9 +471,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             conn.close()
 
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
-
-            if config['frigate'].get('clean_old_images', False):
-                clean_old_images()
 
     # Crop license plate and insert it onto the saved snapshot
     if config['frigate'].get('crop_plate', False):
@@ -567,9 +591,6 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
             conn.close()
 
             send_telegram_notification(image_name, image_path, plate_number, plate_score, original_plate_number, watched_plate)
-
-            if config['frigate'].get('clean_old_images', False):
-                clean_old_images()
 
 def check_first_message():
     global first_message
@@ -860,6 +881,9 @@ def on_message(client, userdata, message):
         plate_number=plate_number,
         watched_plate=watched_plate
     )
+
+    if config['frigate'].get('delete_old_images', False):
+        run_daily()
 
 def setup_db():
     conn = sqlite3.connect(DB_PATH)

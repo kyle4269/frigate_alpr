@@ -61,17 +61,17 @@ def run_daily():
 
     # Check if the function ran today
     if last_run_date < today:
-        _LOGGER.debug("delete_old_images has not run today. Running now.")
+        _LOGGER.debug("delete_old_snapshots has not run today. Running now.")
         # Run the function
-        delete_old_images()
+        delete_old_snapshots()
 
         # Update the last run date
         with open(last_run_file, "w") as file:
             file.write(str(today))
     else:
-            _LOGGER.debug("delete_old_images has already run today. Skipping.")
+            _LOGGER.debug("delete_old_snapshots has already run today. Skipping.")
 
-def delete_old_images():
+def delete_old_snapsots():
     directory = SNAPSHOT_PATH
     try:
         days_to_keep = int(config['frigate'].get('days_of_snapshots', 30))
@@ -80,7 +80,7 @@ def delete_old_images():
         return
 
     if days_to_keep <= 0:
-        _LOGGER.error("days_of_snapshots not in config.yaml or invalid, skipping delete_old_images!")
+        _LOGGER.error("days_of_snapshots not in config.yaml or invalid, skipping delete_old_snapshots!")
         return
 
     extension = 'png'
@@ -882,7 +882,7 @@ def on_message(client, userdata, message):
         watched_plate=watched_plate
     )
 
-    if config['frigate'].get('delete_old_images', False):
+    if config['frigate'].get('delete_old_snapshots', False):
         run_daily()
 
 def setup_db():

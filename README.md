@@ -143,7 +143,7 @@ frigate:
 If you want to only keep X days of snapshots, add the following to your config.yaml:
 ```yml
 frigate:
-  delete_old_images: True
+  delete_old_snapshots: True
   days_of_snapshots: 30 # Default if you don't set your own.
 ```
 

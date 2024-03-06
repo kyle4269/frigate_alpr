@@ -129,7 +129,7 @@ frigate:
   scale_bottom: 2.0 # If detected in the bottom third of the image, this will make the cropped license plate bigger or smaller on the saved snapshot.
 ```
 
-## Clean Saved Snapshots
+## Auto Delete Saved Snapshots
 **DISCLAIMER:**
 
 **PLEASE READ!!**
@@ -138,10 +138,12 @@ frigate:
 
 **INCLUDING ANY EXISTING SNAPSHOTS THAT ARE OLDER THAN THE SPECIFIED NUMBER OF DAYS (days_of_snapshots)!!**
 
+**NOTE: This runs once a day and will add a file "last_run.txt" to your snapshot directory.**
+
 If you want to only keep X days of snapshots, add the following to your config.yaml:
 ```yml
 frigate:
-  clean_old_images: True
+  delete_old_snapshots: True
   days_of_snapshots: 30 # Default if you don't set your own.
 ```
 

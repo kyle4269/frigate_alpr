@@ -24,7 +24,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.4'
+VERSION = '1.3.5'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_plate_recogizer.db'
@@ -71,7 +71,7 @@ def run_daily():
     else:
             _LOGGER.debug("delete_old_snapshots has already run today. Skipping.")
 
-def delete_old_snapsots():
+def delete_old_snapshots():
     directory = SNAPSHOT_PATH
     try:
         days_to_keep = int(config['frigate'].get('days_of_snapshots', 30))

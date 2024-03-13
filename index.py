@@ -24,11 +24,11 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.5'
+VERSION = '1.3.6'
 
 CONFIG_PATH = '/config/config.yml'
-DB_PATH = '/config/frigate_plate_recogizer.db'
-LOG_FILE = '/config/frigate_plate_recogizer.log'
+DB_PATH = '/config/frigate_alpr.db'
+LOG_FILE = '/config/frigate_alpr.log'
 SNAPSHOT_PATH = '/plates'
 
 DATETIME_FORMAT = "%Y-%m-%d_%H-%M"

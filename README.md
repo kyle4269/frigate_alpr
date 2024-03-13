@@ -85,7 +85,7 @@ set `logger_level` in your config to `DEBUG` to see more logging information:
 logger_level: DEBUG
 ```
 
-Logs will be in `/config/frigate_plate_recognizer.log`
+Logs will be in `/config/frigate_alpr.log`
 
 ## Save Snapshot Images to Path
 
@@ -94,7 +94,7 @@ If you want frigate-plate-recognizer to automatically save snapshots of recogniz
 ```yml
 frigate:
   draw_box: True # Optional - Draws a box around the plate on the snapshot along with the license plate text (Required Frigate plus setting)
-  always_save_snapshot: True # Optional - will save a snapshot of every event sent to frigate_plate_recognizer, even if no plate is detected
+  always_save_snapshot: True # Optional - will save a snapshot of every event sent to frigate_alpr, even if no plate is detected
 ```
 
 Snapshots will be saved into the '/plates' directory within your container - to access them directly, map an additional volume within your docker-compose, e.g.:

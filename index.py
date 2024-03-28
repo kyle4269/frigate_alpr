@@ -24,7 +24,7 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.6'
+VERSION = '1.3.7'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_alpr.db'
@@ -930,7 +930,7 @@ def run_mqtt_client():
         password = config['frigate'].get('mqtt_password', '')
         mqtt_client.username_pw_set(username, password)
 
-    mqtt_client.connect(config['frigate']['mqtt_server'])
+    mqtt_client.connect(config['frigate']['mqtt_server'], config['frigate'].get('mqtt_port', 1883))
     mqtt_client.loop_forever()
 
 def load_logger():

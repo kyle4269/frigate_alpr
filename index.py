@@ -1,7 +1,7 @@
 #!/bin/python3
 
 from datetime import datetime
-
+import concurrent.futures
 import os
 import sqlite3
 import time
@@ -13,9 +13,10 @@ import sys
 import json
 import requests
 import io
+import difflib
 
 from datetime import datetime, timedelta
-from PIL import Image, ImageDraw, UnidentifiedImageError, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 from thefuzz import fuzz
 from thefuzz import process
 
@@ -24,7 +25,9 @@ config = None
 first_message = True
 _LOGGER = None
 
-VERSION = '1.3.7'
+executor = None
+
+VERSION = '1.4.0'
 
 CONFIG_PATH = '/config/config.yml'
 DB_PATH = '/config/frigate_alpr.db'
@@ -149,13 +152,13 @@ def send_telegram_notification(image_name, image_path, plate_number, plate_score
         else:
             _LOGGER.debug(f"Telegram error: {response}")
 
-def on_connect(mqtt_client, userdata, flags, rc):
+def on_connect(mqtt_client, userdata, flags, reason_code, properties):
     _LOGGER.info("MQTT Connected")
     mqtt_client.subscribe(config['frigate']['main_topic'] + "/events")
 
-def on_disconnect(mqtt_client, userdata, rc):
-    if rc != 0:
-        _LOGGER.warning("Unexpected disconnection, trying to reconnect")
+def on_disconnect(mqtt_client, userdata,flags, reason_code, properties):
+    if reason_code != 0:
+        _LOGGER.warning(f"Unexpected disconnection, trying to reconnect userdata:{userdata}, flags:{flags}, properties:{properties}")
         while True:
             try:
                 mqtt_client.reconnect()
@@ -380,6 +383,7 @@ def save_image(config, after_data, frigate_url, frigate_event_id, watched_plate,
 
         snapshot = get_snapshot(frigate_event_id, frigate_url, False)
         if not snapshot:
+            _LOGGER.debug(f"Event {frigate_event_id} has no snapshot")
             return
 
         image = Image.open(io.BytesIO(bytearray(snapshot)))
@@ -630,8 +634,11 @@ def get_snapshot(frigate_event_id, frigate_url, cropped):
     snapshot_url = f"{frigate_url}/api/events/{frigate_event_id}/snapshot.jpg"
     _LOGGER.debug(f"event URL: {snapshot_url}")
 
+    # Convert `cropped` to 0 or 1 based on its truthiness
+    crop_value = 1 if cropped else 0
+
     # get snapshot
-    response = requests.get(snapshot_url, params={ "crop": cropped, "quality": 100 })
+    response = requests.get(snapshot_url, params={ "crop": crop_value, "quality": 100 })
 
     # Check if the request was successful (HTTP status code 200)
     if response.status_code != 200:
@@ -808,6 +815,11 @@ def store_plate_in_db(plate_number, plate_score, frigate_event_id, after_data, f
     conn.close()
 
 def on_message(client, userdata, message):
+
+    global executor
+    executor.submit(process_message, message)
+
+def process_message(message):
     if check_first_message():
         return
 
@@ -843,7 +855,12 @@ def on_message(client, userdata, message):
 #        snapshot = get_cropped_snapshot(frigate_event_id, frigate_url)
 #    else:
 
-    snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+#    snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+
+    snapshot = None
+    if after_data['has_snapshot']:
+        snapshot = get_snapshot(frigate_event_id, frigate_url, True)
+
     if not snapshot:
         # Check if the key exists in the dictionary before attempting to delete
         if frigate_event_id in CURRENT_EVENTS:
@@ -915,14 +932,20 @@ def load_config():
 def run_mqtt_client():
     global mqtt_client
     _LOGGER.info(f"Starting MQTT client. Connecting to: {config['frigate']['mqtt_server']}")
-    now = datetime.now()
-    current_time = now.strftime("%Y%m%d%H%M%S")
+#    now = datetime.now()
+#    current_time = now.strftime("%Y%m%d%H%M%S")
 
     # setup mqtt client
-    mqtt_client = mqtt.Client("FrigatePlateRecognizer" + current_time)
-    mqtt_client.on_message = on_message
-    mqtt_client.on_disconnect = on_disconnect
+#    mqtt_client = mqtt.Client("FrigatePlateRecognizer" + current_time)
+#    mqtt_client.on_message = on_message
+#    mqtt_client.on_disconnect = on_disconnect
+
+    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    mqtt_client.enable_logger()
     mqtt_client.on_connect = on_connect
+    mqtt_client.on_disconnect = on_disconnect
+    mqtt_client.on_message = on_message
+
 
     # check if we are using authentication and set username/password if so
     if config['frigate'].get('mqtt_username', False):
@@ -956,6 +979,8 @@ def load_logger():
     _LOGGER.addHandler(file_handler)
 
 def main():
+    global executor
+
     load_config()
     setup_db()
     load_logger()
@@ -969,10 +994,12 @@ def main():
 
     if config.get('plate_recognizer'):
         _LOGGER.info(f"Using Plate Recognizer API")
-    else:
+    elif config.get('code_project'):
         _LOGGER.info(f"Using CodeProject.AI API")
+    else:
+        _LOGGER.warning(f"No valid configuration found for license plate recognition")
 
-
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
     run_mqtt_client()
 
 if __name__ == '__main__':

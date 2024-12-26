@@ -25,6 +25,7 @@ config = None
 first_message = True
 _LOGGER = None
 
+
 executor = None
 
 VERSION = '1.4.0'

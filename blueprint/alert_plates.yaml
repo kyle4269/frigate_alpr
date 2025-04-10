@@ -35,6 +35,26 @@ blueprint:
       default: false
       selector:
         boolean:
+    channel:
+      name: "Channel"
+      description: The notification channel to use. This is only used for Android devices. https://companion.home-assistant.io/docs/notifications/notifications-basic/#notification-channel
+      default: ""
+    importance:
+      name: Importance
+      description: The importance of the notification. This is only used for Android devices. https://companion.home-assistant.io/docs/notifications/notifications-basic/#notification-channel-importance
+      default: "default"
+      selector:
+        select:
+          options:
+            - low
+            - high
+            - default
+            - max
+            - min
+    url:
+      name: URL
+      description: The URL to open when the notification is tapped. https://companion.home-assistant.io/docs/notifications/notifications-basic/#opening-a-url 
+      default: ""
 
 trigger:
   platform: mqtt
@@ -56,6 +76,12 @@ action:
     message: !input message_template
     data:
       tag: "ALPR_NOTIFICATION"
+      importance: !input importance
+      channel: !input channel
+       # iOS URL
+      url: !input url
+      # Android URL
+      clickAction: !input url
       push:
         sound:
           name: "default"

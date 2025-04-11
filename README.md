@@ -1,5 +1,7 @@
 # Frigate ALPR
 
+** This project is no longer being developed due to the native LPR coming in Frigate 0.16.**
+
 Identify license plates via [Plate Recognizer](https://guides.platerecognizer.com/) or [CodeProject.AI](https://www.codeproject.com/) and add them as sublabels to [blakeblackshear/frigate](https://github.com/blakeblackshear/frigate)
 
 **The core foundation of this code is based on the exceptional work found in  [Frigate_Plate_recognizer](https://github.com/ljmerza/frigate_plate_recognizer). I have contributed by integrating my own modifications and enhancements to further refine its functionality.**
